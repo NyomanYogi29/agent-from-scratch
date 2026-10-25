@@ -1,13 +1,17 @@
 import { generateText, type ModelMessage } from "ai";
-import { workingMemory } from "./memory";
+import { workingMemory } from "./short-term-memory";
 import { openrouter, SYSTEM } from "../adapters";
 import { config } from "../config";
+import { episodic } from "./episodic";
 
 export async function generateResponse(
   userId: number,
   userPrompt: string,
 ): Promise<string> {
-  const history = await workingMemory.getMessages(userId);
+  const [history, episodicContext] = await Promise.all([
+    workingMemory.getMessages(userId),
+    Promise.resolve(episodic.retrieveContext(userId, userPrompt)),
+  ]);
 
   const messages: ModelMessage[] = [
     ...history,
@@ -23,7 +27,7 @@ export async function generateResponse(
         reasoning: { exclude: true, effort: "none" },
       },
     }),
-    system: SYSTEM,
+    system: SYSTEM(episodicContext),
     messages,
     maxOutputTokens: 500,
   });

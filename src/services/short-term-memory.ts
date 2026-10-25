@@ -12,11 +12,10 @@ export class ShortTermMemory {
   private readonly ttlSeconds: number;
 
   /**
-   *
-   * @param maxMessages maximum sum of messages that can be stored. Preferred even number over odd for pairing message => 24 : 2 = 12 dialogs
+   * @param maxMessages maximum sum of messages that can be stored. Preferred even number over odd for pairing message => 20 : 2 = 10 dialogs
    * @param ttlSeonds Expiration time for memory if there are not incoming messages. Default: 24 hours
    */
-  constructor(maxMessages = 24, ttlSeonds = 86400) {
+  constructor(maxMessages = 20, ttlSeonds = 86400) {
     this.maxMessages = maxMessages;
     this.ttlSeconds = ttlSeonds;
   }
@@ -94,4 +93,4 @@ export class ShortTermMemory {
   }
 }
 
-export const workingMemory = new ShortTermMemory(24);
+export const workingMemory = new ShortTermMemory();

@@ -3,6 +3,7 @@ import { config } from ".";
 
 export class RedisManager {
   private static instance: RedisClient | null = null;
+  private static isClosing = false;
 
   public static getClient(): RedisClient {
     if (!RedisManager.instance) {
@@ -19,6 +20,11 @@ export class RedisManager {
       };
 
       client.onclose = (error) => {
+        if (RedisManager.isClosing) {
+          console.log(`[REDIS] Connection closed`);
+          return;
+        }
+
         if (error) {
           console.error(`[REDIS] Disconnected with error: `, error);
         } else {
@@ -43,7 +49,8 @@ export class RedisManager {
 
   public static close(): void {
     if (RedisManager.instance && RedisManager.instance.connected) {
-      console.log(`[REIDS] Closing connection`);
+      console.log(`[REDIS] Closing connection`);
+      RedisManager.isClosing = true;
       RedisManager.instance.close();
     }
   }

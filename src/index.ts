@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { closeDatabase, initDB } from "./config/db";
 import { closeRedis, connectToRedis } from "./config/redis";
 import { TelegramGateway } from "./gateways/telegram";
 import { generateResponse } from "./services/generate-response";
@@ -7,6 +8,7 @@ async function Bootstrap() {
   console.log(`[SYSTEM] Bootstrapping application`);
 
   // Services
+  initDB();
   await connectToRedis();
 
   // Gateways
@@ -15,7 +17,7 @@ async function Bootstrap() {
     config.MASTER_TELEGRAM_ID,
     async ({ userId, text }) => {
       if (text.trim() === "/reset") {
-        const { workingMemory } = await import("./services/memory");
+        const { workingMemory } = await import("./services/short-term-memory");
         await workingMemory.clear(userId);
         return `You decided to clear my short term memory, sliding window purged...`;
       }
@@ -36,6 +38,7 @@ async function Bootstrap() {
     try {
       await telegram.stop();
       closeRedis();
+      closeDatabase();
       console.log(`[SYSTEM] Successfully shutting down telegram gateway`);
       process.exit(0);
     } catch (error) {
@@ -60,5 +63,6 @@ async function Bootstrap() {
 Bootstrap().catch((err) => {
   console.error(`[SYSTEM] Fatal error during bootstrap: `, err);
   closeRedis();
+  closeDatabase();
   process.exit(1);
 });
