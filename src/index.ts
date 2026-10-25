@@ -1,34 +1,64 @@
-import { Bot } from "grammy";
 import { config } from "./config";
-import { model } from "./adapters";
-import { generateText } from "ai";
-import { SYSTEM } from "./adapters";
+import { closeRedis, connectToRedis } from "./config/redis";
+import { TelegramGateway } from "./gateways/telegram";
+import { generateResponse } from "./services/generate-response";
 
-const bot = new Bot(config.TELEGRAM_BOT_TOKEN);
+async function Bootstrap() {
+  console.log(`[SYSTEM] Bootstrapping application`);
 
-bot.use(async (ctx, next) => {
-  if (ctx.from?.id !== config.MASTER_TELEGRAM_ID) {
-    return;
-  }
+  // Services
+  await connectToRedis();
 
-  await next();
+  // Gateways
+  const telegram = new TelegramGateway(
+    config.TELEGRAM_BOT_TOKEN,
+    config.MASTER_TELEGRAM_ID,
+    async ({ userId, text }) => {
+      if (text.trim() === "/reset") {
+        const { workingMemory } = await import("./services/memory");
+        await workingMemory.clear(userId);
+        return `You decided to clear my short term memory, sliding window purged...`;
+      }
+
+      return await generateResponse(userId, text);
+    },
+  );
+
+  // Graceful shutdown mechanism
+  let isShuttingDown: boolean = false;
+  const shutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.log(
+      `[SYSTEM] Receiving signal ${signal}. Initiating graceful shutdown`,
+    );
+    try {
+      await telegram.stop();
+      closeRedis();
+      console.log(`[SYSTEM] Successfully shutting down telegram gateway`);
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        `[SYSTEM] Error occured during shutting down process: `,
+        error,
+      );
+      process.exit(1);
+    }
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  process.on("unhandledRejection", (reason) => {
+    console.error(`[SYSTEM] Unhandled rejection: `, reason);
+  });
+
+  await telegram.start();
+}
+
+Bootstrap().catch((err) => {
+  console.error(`[SYSTEM] Fatal error during bootstrap: `, err);
+  closeRedis();
+  process.exit(1);
 });
-
-bot.on("message:text", async (ctx) => {
-  const userPrompt = ctx.message.text;
-  await ctx.replyWithChatAction("typing");
-
-  try {
-    const { text } = await generateText({
-      model,
-      prompt: userPrompt,
-      instructions: SYSTEM(new Date()),
-    });
-
-    await ctx.reply(text);
-  } catch (error) {
-    await ctx.reply("Oh noo, error!!");
-  }
-});
-
-bot.start();

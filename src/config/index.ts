@@ -12,4 +12,9 @@ export const config = Object.freeze({
   OPENROUTER_API_KEY: getEnvOrDefault("OPENROUTER_API_KEY", ""),
   OPENROUTER_BASE_URL: getEnvOrDefault("OPENROUTER_BASE_URL", ""),
   OPENROUTER_MODEL: getEnvOrDefault("OPENROUTER_MODEL", ""),
+
+  REDIS_URL: getEnvOrDefault("REDIS_URL", ""),
 });
+
+// Singleton for master's full name
+export const master_name = config.MASTER_FULL_NAME;
