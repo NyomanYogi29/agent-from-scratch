@@ -2,7 +2,7 @@ import { config } from "./config";
 import { closeDatabase, initDB } from "./config/db";
 import { closeRedis, connectToRedis } from "./config/redis";
 import { TelegramGateway } from "./gateways/telegram";
-import { generateResponse } from "./services/generate-response";
+import { episodic, generateResponse, workingMemory } from "./services";
 
 async function Bootstrap() {
   console.log(`[SYSTEM] Bootstrapping application`);
@@ -16,10 +16,22 @@ async function Bootstrap() {
     config.TELEGRAM_BOT_TOKEN,
     config.MASTER_TELEGRAM_ID,
     async ({ userId, text }) => {
-      if (text.trim() === "/reset") {
-        const { workingMemory } = await import("./services/short-term-memory");
+      const command = text.trim();
+
+      if (command === "/reset") {
         await workingMemory.clear(userId);
         return `You've decided to clear my short term memory... Purging...`;
+      }
+
+      if (command === "/consolidation") {
+        const result = await episodic.consolidateManual(userId);
+        if (result.status === "busy") {
+          return `Consolidation is already running in the background. Please wait a moment.`;
+        }
+        if (result.status === "empty") {
+          return `Short-term memory is currently empty, nothing to consolidate.`;
+        }
+        return `Episodic memory consolidated (${result.consolidatedCount} messages archived under topic "${result.topic}", ${result.remainingCount} recent messages kept in STM).`;
       }
 
       return await generateResponse(userId, text);
@@ -39,7 +51,7 @@ async function Bootstrap() {
       await telegram.stop();
       closeRedis();
       closeDatabase();
-      console.log(`[SYSTEM] Successfully shutting down telegram gateway`);
+      console.log(`[SYSTEM] Gracefully shutting down...`);
       process.exit(0);
     } catch (error) {
       console.error(

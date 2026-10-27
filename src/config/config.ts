@@ -12,6 +12,7 @@ export const config = Object.freeze({
   OPENROUTER_API_KEY: getEnvOrDefault("OPENROUTER_API_KEY", ""),
   OPENROUTER_BASE_URL: getEnvOrDefault("OPENROUTER_BASE_URL", ""),
   OPENROUTER_MODEL: getEnvOrDefault("OPENROUTER_MODEL", ""),
+  OPENROUTER_EMBEDDING_MODEL: getEnvOrDefault("OPENROUTER_EMBEDDING_MODEL", ""),
 
   REDIS_URL: getEnvOrDefault("REDIS_URL", ""),
 });

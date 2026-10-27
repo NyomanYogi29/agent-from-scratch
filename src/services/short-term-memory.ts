@@ -24,7 +24,9 @@ export class ShortTermMemory {
     return `memory:stm:${userId}`;
   }
 
-  public async getMessages(userId: number | string): Promise<ModelMessage[]> {
+  public async getStoredMessages(
+    userId: number | string,
+  ): Promise<StoredChatMessage[]> {
     const key = this.getKey(userId);
     const rawList = (await redis.send("LRANGE", [key, "0", "-1"])) as
       | string[]
@@ -34,15 +36,12 @@ export class ShortTermMemory {
       return [];
     }
 
-    const messages: ModelMessage[] = [];
+    const stored: StoredChatMessage[] = [];
 
     for (const item of rawList) {
       try {
         const parsed = JSON.parse(item) as StoredChatMessage;
-        messages.push({
-          role: parsed.role,
-          content: parsed.content,
-        });
+        stored.push(parsed);
       } catch (err) {
         console.warn(
           `[ShortTermMemory] Failed to parse message from Redis: `,
@@ -51,14 +50,22 @@ export class ShortTermMemory {
       }
     }
 
-    return messages;
+    return stored;
+  }
+
+  public async getMessages(userId: number | string): Promise<ModelMessage[]> {
+    const stored = await this.getStoredMessages(userId);
+    return stored.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
   }
 
   public async appendInteraction(
     userId: number | string,
     userText: string,
     assistantText: string,
-  ) {
+  ): Promise<{ totalMessages: number; isWindowFull: boolean }> {
     const key = this.getKey(userId);
     const now = Date.now();
 
@@ -74,17 +81,29 @@ export class ShortTermMemory {
       timestamps: now,
     };
 
-    const trimStart = `-${this.maxMessages}`;
-
-    await Promise.all([
+    const [length] = await Promise.all([
       redis.send("RPUSH", [
         key,
         JSON.stringify(userMessage),
         JSON.stringify(assistantMessage),
-      ]),
-      redis.send("LTRIM", [key, trimStart, "-1"]),
+      ]) as Promise<number>,
       redis.expire(key, this.ttlSeconds),
     ]);
+
+    const totalMessages = Number(length);
+    return {
+      totalMessages,
+      isWindowFull: totalMessages >= this.maxMessages,
+    };
+  }
+
+  public async removeOldest(
+    userId: number | string,
+    count: number,
+  ): Promise<void> {
+    if (count <= 0) return;
+    const key = this.getKey(userId);
+    await redis.send("LTRIM", [key, String(count), "-1"]);
   }
 
   public async clear(userId: number | string): Promise<void> {
