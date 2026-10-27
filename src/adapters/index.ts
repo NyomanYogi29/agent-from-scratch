@@ -1,2 +1,2 @@
-export * from "./openrouter";
-export * from "./system_prompt";
+export { openrouter } from "./openrouter";
+export { SYSTEM } from "./system_prompt";

@@ -19,7 +19,7 @@ async function Bootstrap() {
       if (text.trim() === "/reset") {
         const { workingMemory } = await import("./services/short-term-memory");
         await workingMemory.clear(userId);
-        return `You decided to clear my short term memory, sliding window purged...`;
+        return `You've decided to clear my short term memory... Purging...`;
       }
 
       return await generateResponse(userId, text);
